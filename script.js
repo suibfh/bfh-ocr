@@ -21,44 +21,25 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'Tesseract OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // ここでloggerオプションをcreateWorkerに直接渡します
-            worker = await Tesseract.createWorker({
-                logger: m => {
-                    // console.log(m); // デバッグ用にコメント解除しても良い
-                    if (m.status === 'recognizing text') {
-                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
-                    } else if (
-                        m.status === 'loading tesseract core' ||
-                        m.status === 'initializing tesseract' ||
-                        m.status === 'loading language traineddata' ||
-                        m.status === 'downloading' // 新しいtesseract.jsでダウンロード進捗も出る場合がある
-                    ) {
-                        let statusText = m.status
-                            .replace('tesseract ', '')
-                            .replace('traineddata', '')
-                            .replace('loading', 'ロード中')
-                            .replace('initializing', '初期化中')
-                            .replace('downloading', 'ダウンロード中');
-                        // ダウンロード進捗がある場合はパーセンテージも表示
-                        if (m.progress) {
-                            statusText += ` ${Math.floor(m.progress * 100)}%`;
-                        }
-                        loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
-                    }
-                }
-            });
+            // ここではloggerオプションを渡しません
+            worker = await Tesseract.createWorker();
             
-            // 日本語と英語をロード
+            // Tesseractコア、言語データなどの初期化進捗をここで監視
+            // Tesseract.createWorker() の呼び出し自体は進捗を返さないため、
+            // ユーザーに表示するメッセージは単純なローディング状態になります。
+            // より詳細な初期化進捗が必要な場合は、Tesseract.loadLanguage() や .initialize() の前に
+            // 手動でメッセージを更新するか、より高度な方法を検討する必要があります。
+            // 現状は、最低限のメッセージで初期化中であることを伝えます。
+            loadingMessage.textContent = 'OCRエンジン準備中...';
+
             await worker.loadLanguage('jpn+eng');
             await worker.initialize('jpn+eng');
 
-            // ページセグメンテーションモード (PSM) の設定
             await worker.setParameters({
                 tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD 
             });
 
             loadingMessage.textContent = 'OCRエンジンの準備ができました。';
-            // 初期化が完了したら、ローダーメッセージを非表示に戻します。
             loadingMessage.classList.add('hidden'); 
         }
     }
@@ -67,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWorker().catch(err => {
         console.error("Workerの初期化中にエラー:", err);
         loadingMessage.textContent = 'OCRエンジンの初期化に失敗しました。ページを再読み込みしてください。';
-        loadingMessage.classList.remove('hidden'); // エラー表示を継続
+        loadingMessage.classList.remove('hidden'); 
     });
 
     recognizeButton.addEventListener('click', async () => {
@@ -82,22 +63,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        outputTextarea.value = ''; // 前回の結果をクリア
-        loadingMessage.classList.remove('hidden'); // ローディング表示
-        loadingMessage.textContent = 'OCR処理中: 0%'; // 処理開始時の進捗表示
+        outputTextarea.value = ''; 
+        loadingMessage.classList.remove('hidden'); 
+        loadingMessage.textContent = 'OCR処理中: 0%'; 
 
         try {
-            // OCR実行
-            const { data: { text } } = await worker.recognize(file);
+            // ここで recognize() メソッドのプログレスイベントを監視します
+            const { data: { text } } = await worker.recognize(file, {
+                // recognize() の第2引数で進捗を監視
+                // このloggerは recognize() 処理中の進捗のみを報告します
+                logger: m => {
+                    if (m.status === 'recognizing text') {
+                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
+                    }
+                }
+            });
 
-            outputTextarea.value = text; // 結果を表示
+            outputTextarea.value = text; 
 
         } catch (error) {
             console.error('OCRエラー:', error);
             outputTextarea.value = 'OCR中にエラーが発生しました。コンソールで詳細を確認してください。';
             alert('OCR中にエラーが発生しました。');
         } finally {
-            loadingMessage.classList.add('hidden'); // 処理完了後はローディング非表示
+            loadingMessage.classList.add('hidden'); 
         }
     });
 });
