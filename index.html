@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BFH-OCR: ゲーム画面OCRツール</title>
+    <link rel="stylesheet" href="style.css">
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+</head>
+<body>
+    <div id="ocr-container">
+        <h1>BFH-OCR: ゲーム画面OCRツール</h1>
+        <p>スクリーンショットをアップロードしてテキストを抽出します。</p>
+
+        <div class="input-section">
+            <label for="imageInput" class="custom-file-upload">
+                画像を選択
+                <input type="file" id="imageInput" accept="image/*">
+            </label>
+            <button id="recognizeButton">OCR実行</button>
+        </div>
+        
+        <p id="loading" class="hidden">OCR処理中...</p>
+
+        <div class="output-section">
+            <h2>認識結果:</h2>
+            <textarea id="output" rows="15" placeholder="ここに認識されたテキストが表示されます。" readonly></textarea>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2025 BFH-OCR. powered by <a href="https://tesseract.js.org/" target="_blank" rel="noopener noreferrer">tesseract.js</a></p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
