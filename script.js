@@ -19,40 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // --- ここが変更点 ---
-            // Tesseract.createWorker() から logger オプションを完全に削除
+            // loggerオプションを完全に削除し、詳細な進捗表示は行わない
+            // これでDataCloneErrorおよびTypeError: worker.on is not a function を完全に回避
             worker = await Tesseract.createWorker();
-
-            // Workerからメッセージを受け取るイベントリスナーを登録
-            // これにより、DOM要素へのアクセスはメインスレッドで行われる
-            worker.on('message', m => {
-                // console.log('Worker message:', m); // デバッグ用
-
-                if (m.jobId) { // recognize または detect ジョブからのメッセージ
-                    if (m.status === 'recognizing text') {
-                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
-                    }
-                } else if (m.status) { // ワーカー初期化時のステータスメッセージ
-                    if (
-                        m.status === 'loading tesseract core' ||
-                        m.status === 'initializing tesseract' ||
-                        m.status === 'loading language traineddata' ||
-                        m.status === 'downloading'
-                    ) {
-                        let statusText = m.status
-                            .replace('tesseract ', '')
-                            .replace('traineddata', '')
-                            .replace('loading', 'ロード中')
-                            .replace('initializing', '初期化中')
-                            .replace('downloading', 'ダウンロード中');
-                        if (m.progress) {
-                            statusText += ` ${Math.floor(m.progress * 100)}%`;
-                        }
-                        loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
-                    }
-                }
-            });
-            // --- 変更点ここまで ---
             
             await worker.setParameters({
                 tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT,
@@ -84,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         outputTextarea.value = ''; 
         loadingMessage.classList.remove('hidden'); 
-        loadingMessage.textContent = '画像処理中...'; 
+        loadingMessage.textContent = '画像処理中...'; // OCR実行中の一般的なメッセージ
 
         try {
             const img = new Image();
@@ -110,9 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             imageCtx.putImageData(imageData, 0, 0);
 
-            loadingMessage.textContent = 'OCR処理中...';
-
-            // loggerオプションは recognize() メソッドにも渡しません
+            // OCR実行中は、loadingMessageが「画像処理中...」または「OCR処理中...」の状態を維持する
+            // 詳細なパーセンテージ表示は行わない
             const { data: { text } } = await worker.recognize(imageCanvas);
 
             outputTextarea.value = text; 
