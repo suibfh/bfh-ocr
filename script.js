@@ -21,32 +21,45 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'Tesseract OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // Tesseract Workerを作成し、進捗イベントを登録
-            worker = await Tesseract.createWorker();
-
-            // ここで進捗イベントリスナーを設定します
-            // worker.on() メソッドを使って進捗を受け取り、DOMを更新します
-            worker.on('progress', m => {
-                // console.log(m); // デバッグ用にコメント解除しても良い
-                if (m.status === 'recognizing text') {
-                    loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
-                } else if (m.status === 'loading tesseract core' || m.status === 'initializing tesseract' || m.status === 'loading language traineddata') {
-                    let statusText = m.status.replace('tesseract ', '').replace('traineddata', '').replace('loading', 'ロード中').replace('initializing', '初期化中');
-                    loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
+            // ここでloggerオプションをcreateWorkerに直接渡します
+            worker = await Tesseract.createWorker({
+                logger: m => {
+                    // console.log(m); // デバッグ用にコメント解除しても良い
+                    if (m.status === 'recognizing text') {
+                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
+                    } else if (
+                        m.status === 'loading tesseract core' ||
+                        m.status === 'initializing tesseract' ||
+                        m.status === 'loading language traineddata' ||
+                        m.status === 'downloading' // 新しいtesseract.jsでダウンロード進捗も出る場合がある
+                    ) {
+                        let statusText = m.status
+                            .replace('tesseract ', '')
+                            .replace('traineddata', '')
+                            .replace('loading', 'ロード中')
+                            .replace('initializing', '初期化中')
+                            .replace('downloading', 'ダウンロード中');
+                        // ダウンロード進捗がある場合はパーセンテージも表示
+                        if (m.progress) {
+                            statusText += ` ${Math.floor(m.progress * 100)}%`;
+                        }
+                        loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
+                    }
                 }
             });
-
-            // 言語のロードと初期化
+            
+            // 日本語と英語をロード
             await worker.loadLanguage('jpn+eng');
             await worker.initialize('jpn+eng');
 
             // ページセグメンテーションモード (PSM) の設定
             await worker.setParameters({
-                tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD
+                tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD 
             });
 
             loadingMessage.textContent = 'OCRエンジンの準備ができました。';
-            loadingMessage.classList.add('hidden'); // 初期化完了後は非表示
+            // 初期化が完了したら、ローダーメッセージを非表示に戻します。
+            loadingMessage.classList.add('hidden'); 
         }
     }
 
