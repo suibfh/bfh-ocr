@@ -30,7 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // PSM設定は維持
 
             await worker.setParameters({
-                tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD, // これは維持
+                // tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD, // これは維持
+                tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT, // ← ここをこれに変更
+
                 // 日本語を優先して認識させる設定を試す
                 lang: 'jpn' // これを追加して、明示的に日本語のみを認識対象とする
             });
