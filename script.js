@@ -15,45 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Tesseract OCR workerを初期化します。
      * この関数は一度だけ呼び出され、Workerを再利用します。
-     * 最新のTesseract.jsでは、workerは言語がプレロードされ、初期化された状態で提供されます。
      */
     async function initializeWorker() {
         if (!worker) { // workerがまだ存在しない場合のみ作成
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // --- ここが重要 ---
-            // Tesseract.createWorker() のみで logger を設定します。
-            // この logger はメインスレッドで実行されるため、DOM要素に安全にアクセスできます。
-            worker = await Tesseract.createWorker({
-                logger: m => {
-                    // console.log(m); // デバッグ用にコメント解除しても良い
-                    if (m.status === 'recognizing text') {
-                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
-                    } else if (
-                        m.status === 'loading tesseract core' ||
-                        m.status === 'initializing tesseract' ||
-                        m.status === 'loading language traineddata' ||
-                        m.status === 'downloading'
-                    ) {
-                        let statusText = m.status
-                            .replace('tesseract ', '')
-                            .replace('traineddata', '')
-                            .replace('loading', 'ロード中')
-                            .replace('initializing', '初期化中')
-                            .replace('downloading', 'ダウンロード中');
-                        if (m.progress) {
-                            statusText += ` ${Math.floor(m.progress * 100)}%`;
-                        }
-                        loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
-                    }
-                }
-            });
+            // --- ここが最重要 ---
+            // loggerオプションをTesseract.createWorker() から完全に削除します。
+            // これによりDataCloneErrorの根本原因を排除します。
+            worker = await Tesseract.createWorker();
             // --- ここまで ---
             
-            // `loadLanguage` と `initialize` の呼び出しは不要になりました (非推奨警告のため削除)
-
-            // ページセグメンテーションモード (PSM) の設定
+            // PSM設定は維持
             await worker.setParameters({
                 tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD 
             });
@@ -84,14 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         outputTextarea.value = ''; 
         loadingMessage.classList.remove('hidden'); 
-        loadingMessage.textContent = 'OCR処理中...'; 
+        loadingMessage.textContent = 'OCR処理中...'; // 進捗表示は簡略化
 
         try {
-            // --- ここが重要 ---
-            // worker.recognize() の呼び出しには logger オプションを渡しません。
-            // 進捗は createWorker() で設定した logger が自動的に処理します。
+            // recognize() メソッドの呼び出しにも logger オプションを渡しません。
+            // これにより、DataCloneErrorの原因を完全に排除します。
             const { data: { text } } = await worker.recognize(file);
-            // --- ここまで ---
 
             outputTextarea.value = text; 
 
