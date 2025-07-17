@@ -4,34 +4,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const outputTextarea = document.getElementById('output');
     const loadingMessage = document.getElementById('loading');
 
-    // 新しく追加するCanvas要素
     const imageCanvas = document.getElementById('image_canvas');
     const imageCtx = imageCanvas ? imageCanvas.getContext('2d') : null;
 
-    // 要素が存在するか確認
     if (!imageInput || !recognizeButton || !outputTextarea || !loadingMessage || !imageCanvas || !imageCtx) {
         console.error("OCRツールに必要なHTML要素が見つかりません。HTMLを確認してください。");
         return;
     }
 
-    let worker; // Tesseract workerをグローバルスコープで宣言
+    let worker;
 
-    /**
-     * Tesseract OCR workerを初期化します。
-     * この関数は一度だけ呼び出され、Workerを再利用します。
-     */
     async function initializeWorker() {
-        if (!worker) { // workerがまだ存在しない場合のみ作成
+        if (!worker) {
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // loggerオプションをTesseract.createWorker() に渡して進捗表示を再導入
-            worker = await Tesseract.createWorker({
-                logger: m => {
-                    // console.log(m); // デバッグ用にコメント解除しても良い
+            // --- ここが変更点 ---
+            // Tesseract.createWorker() から logger オプションを完全に削除
+            worker = await Tesseract.createWorker();
+
+            // Workerからメッセージを受け取るイベントリスナーを登録
+            // これにより、DOM要素へのアクセスはメインスレッドで行われる
+            worker.on('message', m => {
+                // console.log('Worker message:', m); // デバッグ用
+
+                if (m.jobId) { // recognize または detect ジョブからのメッセージ
                     if (m.status === 'recognizing text') {
                         loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
-                    } else if (
+                    }
+                } else if (m.status) { // ワーカー初期化時のステータスメッセージ
+                    if (
                         m.status === 'loading tesseract core' ||
                         m.status === 'initializing tesseract' ||
                         m.status === 'loading language traineddata' ||
@@ -50,10 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+            // --- 変更点ここまで ---
             
             await worker.setParameters({
-                tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT, // ← PSM_SPARSE_TEXT に固定
-                lang: 'jpn' // 日本語限定のまま
+                tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT,
+                lang: 'jpn'
             });
 
             loadingMessage.textContent = 'OCRエンジンの準備ができました。';
@@ -61,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ページの読み込みが完了したらworkerを自動的に初期化開始
     initializeWorker().catch(err => {
         console.error("Workerの初期化中にエラー:", err);
         loadingMessage.textContent = 'OCRエンジンの初期化に失敗しました。ページを再読み込みしてください。';
@@ -85,18 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingMessage.textContent = '画像処理中...'; 
 
         try {
-            // --- 画像の読み込みとCanvasへの描画 ---
             const img = new Image();
             img.src = URL.createObjectURL(file);
 
-            await new Promise(resolve => img.onload = resolve); // 画像の読み込みを待つ
+            await new Promise(resolve => img.onload = resolve);
 
-            // Canvasのサイズを画像に合わせる
             imageCanvas.width = img.width;
             imageCanvas.height = img.height;
-            imageCtx.drawImage(img, 0, 0); // 元の画像をCanvasに描画
+            imageCtx.drawImage(img, 0, 0);
 
-            // --- ここから画像処理：二値化 ---
             const imageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
             const data = imageData.data;
             const threshold = 160; // ★この値を調整してください (0-255) ★
@@ -107,14 +106,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 data[i] = color;
                 data[i + 1] = color;
                 data[i + 2] = color;
-                data[i + 3] = 255; // Alpha
+                data[i + 3] = 255;
             }
-            imageCtx.putImageData(imageData, 0, 0); // 二値化された画像をCanvasに戻す
-            // --- 画像処理：ここまで ---
+            imageCtx.putImageData(imageData, 0, 0);
 
             loadingMessage.textContent = 'OCR処理中...';
 
-            // 加工したCanvasデータをOCRに渡す
+            // loggerオプションは recognize() メソッドにも渡しません
             const { data: { text } } = await worker.recognize(imageCanvas);
 
             outputTextarea.value = text; 
