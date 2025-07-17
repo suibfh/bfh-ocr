@@ -13,28 +13,47 @@ document.addEventListener('DOMContentLoaded', () => {
     let worker; // Tesseract workerをグローバルスコープで宣言
 
     /**
-     * Tesseract OCR workerを初期化し、言語データをロードします。
+     * Tesseract OCR workerを初期化します。
      * この関数は一度だけ呼び出され、Workerを再利用します。
+     * 最新のTesseract.jsでは、workerは言語がプレロードされ、初期化された状態で提供されます。
      */
     async function initializeWorker() {
         if (!worker) { // workerがまだ存在しない場合のみ作成
             loadingMessage.classList.remove('hidden');
-            loadingMessage.textContent = 'Tesseract OCRエンジンをロード中... (初回のみ時間がかかります)';
+            loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // ここではloggerオプションを渡しません
-            worker = await Tesseract.createWorker();
+            // --- ここが重要 ---
+            // Tesseract.createWorker() のみで logger を設定します。
+            // この logger はメインスレッドで実行されるため、DOM要素に安全にアクセスできます。
+            worker = await Tesseract.createWorker({
+                logger: m => {
+                    // console.log(m); // デバッグ用にコメント解除しても良い
+                    if (m.status === 'recognizing text') {
+                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
+                    } else if (
+                        m.status === 'loading tesseract core' ||
+                        m.status === 'initializing tesseract' ||
+                        m.status === 'loading language traineddata' ||
+                        m.status === 'downloading'
+                    ) {
+                        let statusText = m.status
+                            .replace('tesseract ', '')
+                            .replace('traineddata', '')
+                            .replace('loading', 'ロード中')
+                            .replace('initializing', '初期化中')
+                            .replace('downloading', 'ダウンロード中');
+                        if (m.progress) {
+                            statusText += ` ${Math.floor(m.progress * 100)}%`;
+                        }
+                        loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
+                    }
+                }
+            });
+            // --- ここまで ---
             
-            // Tesseractコア、言語データなどの初期化進捗をここで監視
-            // Tesseract.createWorker() の呼び出し自体は進捗を返さないため、
-            // ユーザーに表示するメッセージは単純なローディング状態になります。
-            // より詳細な初期化進捗が必要な場合は、Tesseract.loadLanguage() や .initialize() の前に
-            // 手動でメッセージを更新するか、より高度な方法を検討する必要があります。
-            // 現状は、最低限のメッセージで初期化中であることを伝えます。
-            loadingMessage.textContent = 'OCRエンジン準備中...';
+            // `loadLanguage` と `initialize` の呼び出しは不要になりました (非推奨警告のため削除)
 
-            await worker.loadLanguage('jpn+eng');
-            await worker.initialize('jpn+eng');
-
+            // ページセグメンテーションモード (PSM) の設定
             await worker.setParameters({
                 tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD 
             });
@@ -65,19 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         outputTextarea.value = ''; 
         loadingMessage.classList.remove('hidden'); 
-        loadingMessage.textContent = 'OCR処理中: 0%'; 
+        loadingMessage.textContent = 'OCR処理中...'; 
 
         try {
-            // ここで recognize() メソッドのプログレスイベントを監視します
-            const { data: { text } } = await worker.recognize(file, {
-                // recognize() の第2引数で進捗を監視
-                // このloggerは recognize() 処理中の進捗のみを報告します
-                logger: m => {
-                    if (m.status === 'recognizing text') {
-                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
-                    }
-                }
-            });
+            // --- ここが重要 ---
+            // worker.recognize() の呼び出しには logger オプションを渡しません。
+            // 進捗は createWorker() で設定した logger が自動的に処理します。
+            const { data: { text } } = await worker.recognize(file);
+            // --- ここまで ---
 
             outputTextarea.value = text; 
 
