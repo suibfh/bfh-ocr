@@ -4,9 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const outputTextarea = document.getElementById('output');
     const loadingMessage = document.getElementById('loading');
 
+    // 新しく追加するCanvas要素
+    const imageCanvas = document.getElementById('image_canvas');
+    const imageCtx = imageCanvas ? imageCanvas.getContext('2d') : null;
+
     // 要素が存在するか確認
-    if (!imageInput || !recognizeButton || !outputTextarea || !loadingMessage) {
-        console.error("OCRツールに必要な要素が見つかりません。HTMLを確認してください。");
+    if (!imageInput || !recognizeButton || !outputTextarea || !loadingMessage || !imageCanvas || !imageCtx) {
+        console.error("OCRツールに必要なHTML要素が見つかりません。HTMLを確認してください。");
         return;
     }
 
@@ -21,20 +25,35 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // --- ここが最重要 ---
-            // loggerオプションをTesseract.createWorker() から完全に削除します。
-            // これによりDataCloneErrorの根本原因を排除します。
-            worker = await Tesseract.createWorker();
-            // --- ここまで ---
+            // loggerオプションをTesseract.createWorker() に渡して進捗表示を再導入
+            worker = await Tesseract.createWorker({
+                logger: m => {
+                    // console.log(m); // デバッグ用にコメント解除しても良い
+                    if (m.status === 'recognizing text') {
+                        loadingMessage.textContent = `OCR処理中: ${Math.floor(m.progress * 100)}%`;
+                    } else if (
+                        m.status === 'loading tesseract core' ||
+                        m.status === 'initializing tesseract' ||
+                        m.status === 'loading language traineddata' ||
+                        m.status === 'downloading'
+                    ) {
+                        let statusText = m.status
+                            .replace('tesseract ', '')
+                            .replace('traineddata', '')
+                            .replace('loading', 'ロード中')
+                            .replace('initializing', '初期化中')
+                            .replace('downloading', 'ダウンロード中');
+                        if (m.progress) {
+                            statusText += ` ${Math.floor(m.progress * 100)}%`;
+                        }
+                        loadingMessage.textContent = `OCRエンジン準備中: ${statusText}...`;
+                    }
+                }
+            });
             
-            // PSM設定は維持
-
             await worker.setParameters({
-                // tessedit_pageseg_mode: Tesseract.PSM.PSM_AUTO_OSD, // これは維持
-                tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT, // ← ここをこれに変更
-
-                // 日本語を優先して認識させる設定を試す
-                lang: 'jpn' // これを追加して、明示的に日本語のみを認識対象とする
+                tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT, // ← PSM_SPARSE_TEXT に固定
+                lang: 'jpn' // 日本語限定のまま
             });
 
             loadingMessage.textContent = 'OCRエンジンの準備ができました。';
@@ -63,12 +82,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
         outputTextarea.value = ''; 
         loadingMessage.classList.remove('hidden'); 
-        loadingMessage.textContent = 'OCR処理中...'; // 進捗表示は簡略化
+        loadingMessage.textContent = '画像処理中...'; 
 
         try {
-            // recognize() メソッドの呼び出しにも logger オプションを渡しません。
-            // これにより、DataCloneErrorの原因を完全に排除します。
-            const { data: { text } } = await worker.recognize(file);
+            // --- 画像の読み込みとCanvasへの描画 ---
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+
+            await new Promise(resolve => img.onload = resolve); // 画像の読み込みを待つ
+
+            // Canvasのサイズを画像に合わせる
+            imageCanvas.width = img.width;
+            imageCanvas.height = img.height;
+            imageCtx.drawImage(img, 0, 0); // 元の画像をCanvasに描画
+
+            // --- ここから画像処理：二値化 ---
+            const imageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+            const data = imageData.data;
+            const threshold = 160; // ★この値を調整してください (0-255) ★
+
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                const color = gray > threshold ? 255 : 0;
+                data[i] = color;
+                data[i + 1] = color;
+                data[i + 2] = color;
+                data[i + 3] = 255; // Alpha
+            }
+            imageCtx.putImageData(imageData, 0, 0); // 二値化された画像をCanvasに戻す
+            // --- 画像処理：ここまで ---
+
+            loadingMessage.textContent = 'OCR処理中...';
+
+            // 加工したCanvasデータをOCRに渡す
+            const { data: { text } } = await worker.recognize(imageCanvas);
 
             outputTextarea.value = text; 
 

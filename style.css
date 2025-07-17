@@ -148,3 +148,20 @@ textarea::placeholder {
         box-sizing: border-box;
     }
 }
+
+/* --- Canvas要素のスタイリング --- */
+#image_canvas {
+    border: 1px solid #ced4da; /* テキストエリアと同じような枠線 */
+    border-radius: 5px; /* テキストエリアと同じような角丸 */
+    display: block; /* ブロック要素にして、前後の要素と改行を挿入 */
+    margin: 20px auto; /* 上下に余白、左右中央寄せ */
+    max-width: 100%; /* 親要素の幅に合わせて縮小 */
+    height: auto; /* アスペクト比を維持 */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* 軽い影 */
+}
+
+/* 画像が読み込まれていない、またはCanvasに内容がない場合に非表示にする */
+/* JavaScriptでCanvasに画像が描画されたらdisplayを'block'に変更します */
+#image_canvas:not([width="0"]):not([height="0"]) {
+    display: block; /* デフォルトはこれで良いが、JSで表示制御する場合は適宜調整 */
+}
