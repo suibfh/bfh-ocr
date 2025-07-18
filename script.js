@@ -3,11 +3,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const recognizeButton = document.getElementById('recognizeButton');
     const outputTextarea = document.getElementById('output');
     const loadingMessage = document.getElementById('loading');
+    const spinner = document.getElementById('spinner'); // ★追加: spinner要素を取得
 
     const imageCanvas = document.getElementById('image_canvas');
     const imageCtx = imageCanvas ? imageCanvas.getContext('2d') : null;
 
-    if (!imageInput || !recognizeButton || !outputTextarea || !loadingMessage || !imageCanvas || !imageCtx) {
+    if (!imageInput || !recognizeButton || !outputTextarea || !loadingMessage || !imageCanvas || !imageCtx || !spinner) { // ★修正: spinnerもチェック対象に追加
         console.error("OCRツールに必要なHTML要素が見つかりません。HTMLを確認してください。");
         return;
     }
@@ -17,10 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initializeWorker() {
         if (!worker) {
             loadingMessage.classList.remove('hidden');
+            spinner.classList.remove('hidden'); // ★追加: スピナーも表示
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
             // Tesseract.js v2.x 系のAPIに合わせる
             // corePath と langPath の指定を削除。tesseract.min.jsが自動的に解決するのを期待
+            // ★修正: corePathとlangPathの引数を削除
             worker = Tesseract.createWorker(); 
 
             // v2では、ロード、言語ロード、初期化のステップを明示的に呼び出す必要がある
@@ -35,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             loadingMessage.textContent = 'OCRエンジンの準備ができました。';
             loadingMessage.classList.add('hidden'); 
+            spinner.classList.add('hidden'); // ★追加: スピナーを非表示
         }
     }
 
@@ -42,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Workerの初期化中にエラー:", err);
         loadingMessage.textContent = 'OCRエンジンの初期化に失敗しました。ページを再読み込みしてください。';
         loadingMessage.classList.remove('hidden'); 
+        spinner.classList.add('hidden'); // ★追加: スピナーを非表示
     });
 
     recognizeButton.addEventListener('click', async () => {
@@ -58,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         outputTextarea.value = ''; 
         loadingMessage.classList.remove('hidden'); 
+        spinner.classList.remove('hidden'); // ★追加: スピナーも表示
         loadingMessage.textContent = '画像処理中...'; // OCR実行中の一般的なメッセージ
 
         try {
@@ -70,6 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
             imageCanvas.height = img.height;
             imageCtx.drawImage(img, 0, 0);
 
+            // ★★ ここで画像の二値化処理をコメントアウトしていることを前提とします ★★
+            // ご提示いただいたコードでは二値化処理が含まれていましたが、
+            // 以前のチャットで「白黒化ならいったんそこもいいや。」とありましたので、
+            // その意図を汲み、ここでは二値化処理をコメントアウトした状態としています。
+            // 必要であれば、以下のコメントアウトを外してください。
+            /*
             const imageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
             const data = imageData.data;
             const threshold = 160; // ★この値を調整してください (0-255) ★
@@ -83,9 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 data[i + 3] = 255;
             }
             imageCtx.putImageData(imageData, 0, 0);
+            */
 
-            // OCR実行中は、loadingMessageが「画像処理中...」または「OCR処理中...」の状態を維持する
-            // v2のrecognizeメソッドは、(画像, 言語) の形式
             const { data: { text } } = await worker.recognize(imageCanvas, 'jpn');
 
             outputTextarea.value = text; 
@@ -96,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('OCR中にエラーが発生しました。');
         } finally {
             loadingMessage.classList.add('hidden'); 
+            spinner.classList.add('hidden'); // ★追加: スピナーを非表示
         }
     });
 });
