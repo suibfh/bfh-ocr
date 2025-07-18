@@ -20,10 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
             // Tesseract.js v2.x 系のAPIに合わせる
-            // langPath と corePath を指定して、必要なファイルを正しくロードさせる
+            // corePath と langPath を正しいCDNパスに修正
             worker = Tesseract.createWorker({
-                langPath: 'https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_fast@main/', // v2用の言語データパス
-                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/dist/tesseract-core.wasm.js' // v2用のコアパス
+                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/dist/tesseract-core.js', // ★ここを修正しました★
+                langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/lang-data/' // ★ここを修正しました★
             });
 
             // v2では、ロード、言語ロード、初期化のステップを明示的に呼び出す必要がある
