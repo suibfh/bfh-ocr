@@ -19,13 +19,21 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.classList.remove('hidden');
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
-            // loggerオプションを完全に削除し、詳細な進捗表示は行わない
-            // これでDataCloneErrorおよびTypeError: worker.on is not a function を完全に回避
-            worker = await Tesseract.createWorker();
+            // Tesseract.js v2.x 系のAPIに合わせる
+            // langPath と corePath を指定して、必要なファイルを正しくロードさせる
+            worker = Tesseract.createWorker({
+                langPath: 'https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_fast@main/', // v2用の言語データパス
+                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/dist/tesseract-core.wasm.js' // v2用のコアパス
+            });
+
+            // v2では、ロード、言語ロード、初期化のステップを明示的に呼び出す必要がある
+            await worker.load();
+            await worker.loadLanguage('jpn');
+            await worker.initialize('jpn');
             
             await worker.setParameters({
                 tessedit_pageseg_mode: Tesseract.PSM.PSM_SPARSE_TEXT,
-                lang: 'jpn'
+                // lang: 'jpn' は loadLanguage/initialize で指定するため、ここでは不要
             });
 
             loadingMessage.textContent = 'OCRエンジンの準備ができました。';
@@ -80,8 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
             imageCtx.putImageData(imageData, 0, 0);
 
             // OCR実行中は、loadingMessageが「画像処理中...」または「OCR処理中...」の状態を維持する
-            // 詳細なパーセンテージ表示は行わない
-            const { data: { text } } = await worker.recognize(imageCanvas);
+            // 詳細なパーセンテージ表示は行わない（Tesseract.js v2では recognize メソッドの logger を使わない）
+            // v2のrecognizeメソッドは、(画像, 言語) の形式
+            const { data: { text } } = await worker.recognize(imageCanvas, 'jpn');
 
             outputTextarea.value = text; 
 
