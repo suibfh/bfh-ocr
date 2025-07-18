@@ -165,3 +165,20 @@ textarea::placeholder {
 #image_canvas:not([width="0"]):not([height="0"]) {
     display: block; /* デフォルトはこれで良いが、JSで表示制御する場合は適宜調整 */
 }
+
+/* ★★★★★ ここからスピナーのCSSルールを追加 ★★★★★ */
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1); /* 枠の色 */
+    border-left: 4px solid #3498db; /* 回転する色 */
+    border-radius: 50%; /* 円形にする */
+    width: 30px; /* サイズ */
+    height: 30px; /* サイズ */
+    animation: spin 1s linear infinite; /* アニメーションの設定 */
+    margin: 10px auto; /* 中央寄せと余白 */
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* ★★★★★ ここまでスピナーのCSSルールを追加 ★★★★★ */
