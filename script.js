@@ -20,11 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMessage.textContent = 'OCRエンジンをロード中... (初回のみ時間がかかります)';
 
             // Tesseract.js v2.x 系のAPIに合わせる
-            // corePath と langPath を正しいCDNパスに修正
-            worker = Tesseract.createWorker({
-                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/dist/tesseract-core.js', // ★ここを修正しました★
-                langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/lang-data/' // ★ここを修正しました★
-            });
+            // corePath と langPath の指定を削除。tesseract.min.jsが自動的に解決するのを期待
+            worker = Tesseract.createWorker(); 
 
             // v2では、ロード、言語ロード、初期化のステップを明示的に呼び出す必要がある
             await worker.load();
@@ -88,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
             imageCtx.putImageData(imageData, 0, 0);
 
             // OCR実行中は、loadingMessageが「画像処理中...」または「OCR処理中...」の状態を維持する
-            // 詳細なパーセンテージ表示は行わない（Tesseract.js v2では recognize メソッドの logger を使わない）
             // v2のrecognizeメソッドは、(画像, 言語) の形式
             const { data: { text } } = await worker.recognize(imageCanvas, 'jpn');
 
